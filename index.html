@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Duck Countdown</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    background: #0a0a0a;
+    font-family: 'Courier New', monospace;
+    overflow-x: hidden;
+    position: relative;
+  }
+  #bg-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .codes-layer {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .code-tag {
+    position: absolute;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    color: rgba(255,255,255,0.18);
+    letter-spacing: 1px;
+    user-select: none;
+    animation: flicker 4s infinite;
+  }
+  @keyframes flicker {
+    0%, 100% { opacity: 0.18; }
+    50% { opacity: 0.32; }
+  }
+  .main {
+    position: relative;
+    z-index: 10;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+  .title {
+    font-size: clamp(22px, 4vw, 38px);
+    color: #fff;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    text-align: center;
+    text-shadow: 0 0 20px rgba(255,255,255,0.3);
+  }
+  .subtitle {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 4px;
+    margin-bottom: 50px;
+    text-align: center;
+  }
+  .countdown-box {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    padding: 40px 50px;
+    display: flex;
+    gap: 30px;
+    margin-bottom: 50px;
+    backdrop-filter: blur(4px);
+  }
+  .unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .unit-value {
+    font-size: clamp(36px, 7vw, 72px);
+    font-weight: bold;
+    color: #fff;
+    min-width: 2ch;
+    text-align: center;
+    text-shadow: 0 0 30px rgba(255,255,255,0.5);
+  }
+  .unit-label {
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .sep {
+    font-size: clamp(36px, 7vw, 72px);
+    color: rgba(255,255,255,0.3);
+    line-height: 1.1;
+  }
+  .done-msg {
+    display: none;
+    font-size: clamp(24px, 5vw, 48px);
+    color: #fff;
+    letter-spacing: 6px;
+    text-align: center;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  #secret-trigger {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 40px;
+    height: 40px;
+    z-index: 100;
+    cursor: default;
+    opacity: 0;
+  }
+  #secret-panel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0,0,0,0.85);
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(6px);
+  }
+  #secret-panel.open { display: flex; }
+  .panel-box {
+    background: #111;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 36px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 300px;
+    align-items: center;
+    position: relative;
+  }
+  .panel-box label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  #pin-input {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 18px;
+    padding: 10px 18px;
+    outline: none;
+    letter-spacing: 4px;
+    width: 220px;
+    text-align: center;
+  }
+  #pin-input:focus { border-color: rgba(255,255,255,0.5); }
+  #date-section {
+    display: none;
+    flex-direction: column;
+    gap: 14px;
+    align-items: center;
+    width: 100%;
+  }
+  #date-section.visible { display: flex; }
+  #target-date {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    padding: 10px 18px;
+    outline: none;
+    cursor: pointer;
+    color-scheme: dark;
+  }
+  #target-date:focus { border-color: rgba(255,255,255,0.5); }
+  .btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    padding: 9px 22px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: rgba(255,255,255,0.15); }
+  .error-msg {
+    font-size: 11px;
+    color: rgba(255,80,80,0.8);
+    letter-spacing: 2px;
+    display: none;
+  }
+  .success-msg {
+    font-size: 11px;
+    color: rgba(80,255,150,0.8);
+    letter-spacing: 2px;
+    display: none;
+  }
+  #close-btn {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    color: rgba(255,255,255,0.3);
+    font-size: 18px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: monospace;
+  }
+  #close-btn:hover { color: rgba(255,255,255,0.8); }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="codes-layer" id="codes-layer"></div>
+
+<div class="main">
+  <div class="title">Countdown</div>
+  <div class="subtitle">5685</div>
+
+  <div class="countdown-box" id="countdown-box">
+    <div class="unit"><span class="unit-value" id="days">00</span><span class="unit-label">Days</span></div>
+    <span class="sep">:</span>
+    <div class="unit"><span class="unit-value" id="hours">00</span><span class="unit-label">Hours</span></div>
+    <span class="sep">:</span>
+    <div class="unit"><span class="unit-value" id="minutes">00</span><span class="unit-label">Min</span></div>
+    <span class="sep">:</span>
+    <div class="unit"><span class="unit-value" id="seconds">00</span><span class="unit-label">Sec</span></div>
+  </div>
+
+  <div class="done-msg" id="done-msg">🦆 TIME IS UP 🦆</div>
+</div>
+
+<div id="secret-trigger"></div>
+
+<div id="secret-panel">
+  <div class="panel-box">
+    <button id="close-btn">✕</button>
+    <label>Enter Password</label>
+    <input type="password" id="pin-input" maxlength="20" placeholder="············" autocomplete="off">
+    <span class="error-msg" id="error-msg">ACCESS DENIED</span>
+
+    <div id="date-section">
+      <label>Set Target Date</label>
+      <input type="datetime-local" id="target-date">
+      <button class="btn" id="save-btn">Save</button>
+      <span class="success-msg" id="success-msg">DATE UPDATED</span>
+    </div>
+  </div>
+</div>
+
+<script>
+const SECRET_PIN = "alphabitcracker";
+
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', () => { resize(); drawDucks(); });
+
+function drawDuck(ctx, x, y, scale, flipped, style) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (flipped) ctx.scale(-1, 1);
+  ctx.scale(scale, scale);
+  const isWhite = style === 'white';
+  const bodyColor = isWhite ? 'rgba(240,240,240,0.55)' : 'rgba(20,20,20,0.65)';
+  const outlineColor = isWhite ? 'rgba(180,180,180,0.4)' : 'rgba(80,80,80,0.5)';
+  const billColor = isWhite ? 'rgba(180,160,80,0.7)' : 'rgba(100,90,40,0.7)';
+  const eyeColor = isWhite ? 'rgba(30,30,30,0.8)' : 'rgba(220,220,220,0.8)';
+  ctx.strokeStyle = outlineColor; ctx.lineWidth = 1.2; ctx.fillStyle = bodyColor;
+  ctx.beginPath(); ctx.ellipse(0, 0, 28, 18, -0.15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(22, -14, 12, 10, 0.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = billColor; ctx.strokeStyle = outlineColor;
+  ctx.beginPath(); ctx.moveTo(32, -14); ctx.lineTo(42, -12); ctx.lineTo(40, -10); ctx.lineTo(32, -11); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = eyeColor; ctx.beginPath(); ctx.arc(28, -17, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = outlineColor; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-5, 12); ctx.quadraticCurveTo(-20, 30, -26, 18); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(5, 14); ctx.quadraticCurveTo(-5, 30, -12, 20); ctx.stroke();
+  ctx.restore();
+}
+
+function drawDucks() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < 28; i++) {
+    const seed = i * 137.508;
+    drawDuck(ctx, (seed * 41) % canvas.width, (seed * 71) % canvas.height, 0.6 + (i % 5) * 0.15, i % 2 === 0, i % 3 === 0 ? 'black' : 'white');
+  }
+}
+drawDucks();
+
+const codesLayer = document.getElementById('codes-layer');
+for (let i = 0; i < 40; i++) {
+  const el = document.createElement('div');
+  el.className = 'code-tag';
+  el.textContent = '5685';
+  el.style.left = (Math.random() * 95) + '%';
+  el.style.top = (Math.random() * 95) + '%';
+  el.style.animationDelay = (Math.random() * 4) + 's';
+  el.style.fontSize = (10 + Math.floor(Math.random() * 10)) + 'px';
+  el.style.opacity = (0.1 + Math.random() * 0.2);
+  codesLayer.appendChild(el);
+}
+
+let targetDate = new Date();
+targetDate.setDate(targetDate.getDate() + 7);
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function toLocalInput(d) {
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+document.getElementById('target-date').value = toLocalInput(targetDate);
+
+function tick() {
+  const diff = targetDate - new Date();
+  if (diff <= 0) {
+    ['days','hours','minutes','seconds'].forEach(id => document.getElementById(id).textContent = '00');
+    document.getElementById('countdown-box').style.display = 'none';
+    document.getElementById('done-msg').style.display = 'block';
+    return;
+  }
+  document.getElementById('days').textContent = pad(Math.floor(diff / 86400000));
+  document.getElementById('hours').textContent = pad(Math.floor((diff % 86400000) / 3600000));
+  document.getElementById('minutes').textContent = pad(Math.floor((diff % 3600000) / 60000));
+  document.getElementById('seconds').textContent = pad(Math.floor((diff % 60000) / 1000));
+}
+tick();
+setInterval(tick, 1000);
+
+const panel = document.getElementById('secret-panel');
+const pinInput = document.getElementById('pin-input');
+const dateSection = document.getElementById('date-section');
+const errorMsg = document.getElementById('error-msg');
+const successMsg = document.getElementById('success-msg');
+
+document.getElementById('secret-trigger').addEventListener('click', () => {
+  panel.classList.add('open');
+  pinInput.value = '';
+  dateSection.classList.remove('visible');
+  errorMsg.style.display = 'none';
+  successMsg.style.display = 'none';
+  setTimeout(() => pinInput.focus(), 100);
+});
+
+document.getElementById('close-btn').addEventListener('click', () => {
+  panel.classList.remove('open');
+  pinInput.value = '';
+  dateSection.classList.remove('visible');
+});
+
+panel.addEventListener('click', (e) => {
+  if (e.target === panel) {
+    panel.classList.remove('open');
+    pinInput.value = '';
+    dateSection.classList.remove('visible');
+  }
+});
+
+pinInput.addEventListener('input', () => {
+  errorMsg.style.display = 'none';
+  if (pinInput.value === SECRET_PIN) {
+    dateSection.classList.add('visible');
+  } else if (pinInput.value.length >= SECRET_PIN.length) {
+    errorMsg.style.display = 'block';
+    setTimeout(() => { pinInput.value = ''; dateSection.classList.remove('visible'); }, 600);
+  }
+});
+
+document.getElementById('save-btn').addEventListener('click', () => {
+  const val = document.getElementById('target-date').value;
+  if (val) {
+    targetDate = new Date(val);
+    document.getElementById('countdown-box').style.display = 'flex';
+    document.getElementById('done-msg').style.display = 'none';
+    successMsg.style.display = 'block';
+    tick();
+    setTimeout(() => {
+      panel.classList.remove('open');
+      pinInput.value = '';
+      dateSection.classList.remove('visible');
+      successMsg.style.display = 'none';
+    }, 1200);
+  }
+});
+</script>
+</body>
+</html>
