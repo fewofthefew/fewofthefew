@@ -114,6 +114,13 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
   }
+  #loading {
+    font-size: 13px;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    animation: pulse 1.5s infinite;
+  }
   #secret-trigger {
     position: fixed;
     bottom: 0;
@@ -237,7 +244,9 @@
   <div class="title">Countdown</div>
   <div class="subtitle">5685</div>
 
-  <div class="countdown-box" id="countdown-box">
+  <div id="loading">Connecting...</div>
+
+  <div class="countdown-box" id="countdown-box" style="display:none;">
     <div class="unit"><span class="unit-value" id="days">00</span><span class="unit-label">Days</span></div>
     <span class="sep">:</span>
     <div class="unit"><span class="unit-value" id="hours">00</span><span class="unit-label">Hours</span></div>
@@ -258,7 +267,6 @@
     <label>Enter Password</label>
     <input type="password" id="pin-input" maxlength="20" placeholder="············" autocomplete="off">
     <span class="error-msg" id="error-msg">ACCESS DENIED</span>
-
     <div id="date-section">
       <label>Set Target Date</label>
       <input type="datetime-local" id="target-date">
@@ -268,140 +276,189 @@
   </div>
 </div>
 
-<script>
-const SECRET_PIN = "alphabitcracker";
+<!-- Firebase Realtime Database SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
 
-const canvas = document.getElementById('bg-canvas');
-const ctx = canvas.getContext('2d');
+  const firebaseConfig = {
+    apiKey: "AIzaSyDUWmhKwVtVwmX0XflfMYjRQsxOjRrAN-I",
+    authDomain: "fewoffew-51730.firebaseapp.com",
+    databaseURL: "https://fewoffew-51730-default-rtdb.firebaseio.com",
+    projectId: "fewoffew-51730",
+    storageBucket: "fewoffew-51730.firebasestorage.app",
+    messagingSenderId: "1006326896430",
+    appId: "1:1006326896430:web:e1098829e40ee3b07c0cbf"
+  };
 
-function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-resize();
-window.addEventListener('resize', () => { resize(); drawDucks(); });
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const countdownRef = ref(db, 'countdown/targetDate');
 
-function drawDuck(ctx, x, y, scale, flipped, style) {
-  ctx.save();
-  ctx.translate(x, y);
-  if (flipped) ctx.scale(-1, 1);
-  ctx.scale(scale, scale);
-  const isWhite = style === 'white';
-  const bodyColor = isWhite ? 'rgba(240,240,240,0.55)' : 'rgba(20,20,20,0.65)';
-  const outlineColor = isWhite ? 'rgba(180,180,180,0.4)' : 'rgba(80,80,80,0.5)';
-  const billColor = isWhite ? 'rgba(180,160,80,0.7)' : 'rgba(100,90,40,0.7)';
-  const eyeColor = isWhite ? 'rgba(30,30,30,0.8)' : 'rgba(220,220,220,0.8)';
-  ctx.strokeStyle = outlineColor; ctx.lineWidth = 1.2; ctx.fillStyle = bodyColor;
-  ctx.beginPath(); ctx.ellipse(0, 0, 28, 18, -0.15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(22, -14, 12, 10, 0.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = billColor; ctx.strokeStyle = outlineColor;
-  ctx.beginPath(); ctx.moveTo(32, -14); ctx.lineTo(42, -12); ctx.lineTo(40, -10); ctx.lineTo(32, -11); ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = eyeColor; ctx.beginPath(); ctx.arc(28, -17, 2.5, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = outlineColor; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(-5, 12); ctx.quadraticCurveTo(-20, 30, -26, 18); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(5, 14); ctx.quadraticCurveTo(-5, 30, -12, 20); ctx.stroke();
-  ctx.restore();
-}
+  let targetDate = null;
+  let ticker = null;
 
-function drawDucks() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (let i = 0; i < 28; i++) {
-    const seed = i * 137.508;
-    drawDuck(ctx, (seed * 41) % canvas.width, (seed * 71) % canvas.height, 0.6 + (i % 5) * 0.15, i % 2 === 0, i % 3 === 0 ? 'black' : 'white');
+  // ── Listen to DB in real time — all visitors get the same date ──
+  onValue(countdownRef, (snapshot) => {
+    const val = snapshot.val();
+    document.getElementById('loading').style.display = 'none';
+    if (val) {
+      targetDate = new Date(val);
+      const input = document.getElementById('target-date');
+      input.value = toLocalInput(targetDate);
+      startTicker();
+    } else {
+      // No date set yet in DB
+      document.getElementById('countdown-box').style.display = 'flex';
+      document.getElementById('days').textContent = '--';
+      document.getElementById('hours').textContent = '--';
+      document.getElementById('minutes').textContent = '--';
+      document.getElementById('seconds').textContent = '--';
+    }
+  });
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function toLocalInput(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
-}
-drawDucks();
 
-const codesLayer = document.getElementById('codes-layer');
-for (let i = 0; i < 40; i++) {
-  const el = document.createElement('div');
-  el.className = 'code-tag';
-  el.textContent = '5685';
-  el.style.left = (Math.random() * 95) + '%';
-  el.style.top = (Math.random() * 95) + '%';
-  el.style.animationDelay = (Math.random() * 4) + 's';
-  el.style.fontSize = (10 + Math.floor(Math.random() * 10)) + 'px';
-  el.style.opacity = (0.1 + Math.random() * 0.2);
-  codesLayer.appendChild(el);
-}
-
-let targetDate = new Date();
-targetDate.setDate(targetDate.getDate() + 7);
-
-function pad(n) { return String(n).padStart(2, '0'); }
-function toLocalInput(d) {
-  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-}
-document.getElementById('target-date').value = toLocalInput(targetDate);
-
-function tick() {
-  const diff = targetDate - new Date();
-  if (diff <= 0) {
-    ['days','hours','minutes','seconds'].forEach(id => document.getElementById(id).textContent = '00');
-    document.getElementById('countdown-box').style.display = 'none';
-    document.getElementById('done-msg').style.display = 'block';
-    return;
+  function tick() {
+    if (!targetDate) return;
+    const diff = targetDate - new Date();
+    if (diff <= 0) {
+      ['days','hours','minutes','seconds'].forEach(id => document.getElementById(id).textContent = '00');
+      document.getElementById('countdown-box').style.display = 'none';
+      document.getElementById('done-msg').style.display = 'block';
+      clearInterval(ticker);
+      return;
+    }
+    document.getElementById('countdown-box').style.display = 'flex';
+    document.getElementById('done-msg').style.display = 'none';
+    document.getElementById('days').textContent = pad(Math.floor(diff / 86400000));
+    document.getElementById('hours').textContent = pad(Math.floor((diff % 86400000) / 3600000));
+    document.getElementById('minutes').textContent = pad(Math.floor((diff % 3600000) / 60000));
+    document.getElementById('seconds').textContent = pad(Math.floor((diff % 60000) / 1000));
   }
-  document.getElementById('days').textContent = pad(Math.floor(diff / 86400000));
-  document.getElementById('hours').textContent = pad(Math.floor((diff % 86400000) / 3600000));
-  document.getElementById('minutes').textContent = pad(Math.floor((diff % 3600000) / 60000));
-  document.getElementById('seconds').textContent = pad(Math.floor((diff % 60000) / 1000));
-}
-tick();
-setInterval(tick, 1000);
 
-const panel = document.getElementById('secret-panel');
-const pinInput = document.getElementById('pin-input');
-const dateSection = document.getElementById('date-section');
-const errorMsg = document.getElementById('error-msg');
-const successMsg = document.getElementById('success-msg');
+  function startTicker() {
+    clearInterval(ticker);
+    tick();
+    ticker = setInterval(tick, 1000);
+  }
 
-document.getElementById('secret-trigger').addEventListener('click', () => {
-  panel.classList.add('open');
-  pinInput.value = '';
-  dateSection.classList.remove('visible');
-  errorMsg.style.display = 'none';
-  successMsg.style.display = 'none';
-  setTimeout(() => pinInput.focus(), 100);
-});
+  // ── Secret panel logic ──
+  const SECRET_PIN = "alphabitcracker";
+  const panel = document.getElementById('secret-panel');
+  const pinInput = document.getElementById('pin-input');
+  const dateSection = document.getElementById('date-section');
+  const errorMsg = document.getElementById('error-msg');
+  const successMsg = document.getElementById('success-msg');
 
-document.getElementById('close-btn').addEventListener('click', () => {
-  panel.classList.remove('open');
-  pinInput.value = '';
-  dateSection.classList.remove('visible');
-});
+  document.getElementById('secret-trigger').addEventListener('click', () => {
+    panel.classList.add('open');
+    pinInput.value = '';
+    dateSection.classList.remove('visible');
+    errorMsg.style.display = 'none';
+    successMsg.style.display = 'none';
+    setTimeout(() => pinInput.focus(), 100);
+  });
 
-panel.addEventListener('click', (e) => {
-  if (e.target === panel) {
+  document.getElementById('close-btn').addEventListener('click', () => {
     panel.classList.remove('open');
     pinInput.value = '';
     dateSection.classList.remove('visible');
-  }
-});
+  });
 
-pinInput.addEventListener('input', () => {
-  errorMsg.style.display = 'none';
-  if (pinInput.value === SECRET_PIN) {
-    dateSection.classList.add('visible');
-  } else if (pinInput.value.length >= SECRET_PIN.length) {
-    errorMsg.style.display = 'block';
-    setTimeout(() => { pinInput.value = ''; dateSection.classList.remove('visible'); }, 600);
-  }
-});
-
-document.getElementById('save-btn').addEventListener('click', () => {
-  const val = document.getElementById('target-date').value;
-  if (val) {
-    targetDate = new Date(val);
-    document.getElementById('countdown-box').style.display = 'flex';
-    document.getElementById('done-msg').style.display = 'none';
-    successMsg.style.display = 'block';
-    tick();
-    setTimeout(() => {
+  panel.addEventListener('click', (e) => {
+    if (e.target === panel) {
       panel.classList.remove('open');
       pinInput.value = '';
       dateSection.classList.remove('visible');
-      successMsg.style.display = 'none';
-    }, 1200);
-  }
-});
+    }
+  });
+
+  pinInput.addEventListener('input', () => {
+    errorMsg.style.display = 'none';
+    if (pinInput.value === SECRET_PIN) {
+      dateSection.classList.add('visible');
+    } else if (pinInput.value.length >= SECRET_PIN.length) {
+      errorMsg.style.display = 'block';
+      setTimeout(() => { pinInput.value = ''; dateSection.classList.remove('visible'); }, 600);
+    }
+  });
+
+  document.getElementById('save-btn').addEventListener('click', () => {
+    const val = document.getElementById('target-date').value;
+    if (val) {
+      const newDate = new Date(val);
+      // ── Save to Firebase — instantly updates for ALL visitors ──
+      set(countdownRef, newDate.toISOString()).then(() => {
+        successMsg.style.display = 'block';
+        setTimeout(() => {
+          panel.classList.remove('open');
+          pinInput.value = '';
+          dateSection.classList.remove('visible');
+          successMsg.style.display = 'none';
+        }, 1200);
+      });
+    }
+  });
 </script>
+
+<script>
+  // ── Ducks & codes (non-module) ──
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  resize();
+  window.addEventListener('resize', () => { resize(); drawDucks(); });
+
+  function drawDuck(ctx, x, y, scale, flipped, style) {
+    ctx.save();
+    ctx.translate(x, y);
+    if (flipped) ctx.scale(-1, 1);
+    ctx.scale(scale, scale);
+    const isWhite = style === 'white';
+    const bodyColor = isWhite ? 'rgba(240,240,240,0.55)' : 'rgba(20,20,20,0.65)';
+    const outlineColor = isWhite ? 'rgba(180,180,180,0.4)' : 'rgba(80,80,80,0.5)';
+    const billColor = isWhite ? 'rgba(180,160,80,0.7)' : 'rgba(100,90,40,0.7)';
+    const eyeColor = isWhite ? 'rgba(30,30,30,0.8)' : 'rgba(220,220,220,0.8)';
+    ctx.strokeStyle = outlineColor; ctx.lineWidth = 1.2; ctx.fillStyle = bodyColor;
+    ctx.beginPath(); ctx.ellipse(0, 0, 28, 18, -0.15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(22, -14, 12, 10, 0.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = billColor; ctx.strokeStyle = outlineColor;
+    ctx.beginPath(); ctx.moveTo(32, -14); ctx.lineTo(42, -12); ctx.lineTo(40, -10); ctx.lineTo(32, -11); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = eyeColor; ctx.beginPath(); ctx.arc(28, -17, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = outlineColor; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-5, 12); ctx.quadraticCurveTo(-20, 30, -26, 18); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(5, 14); ctx.quadraticCurveTo(-5, 30, -12, 20); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawDucks() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < 28; i++) {
+      const seed = i * 137.508;
+      drawDuck(ctx, (seed * 41) % canvas.width, (seed * 71) % canvas.height, 0.6 + (i % 5) * 0.15, i % 2 === 0, i % 3 === 0 ? 'black' : 'white');
+    }
+  }
+  drawDucks();
+
+  const codesLayer = document.getElementById('codes-layer');
+  for (let i = 0; i < 40; i++) {
+    const el = document.createElement('div');
+    el.className = 'code-tag';
+    el.textContent = '5685';
+    el.style.left = (Math.random() * 95) + '%';
+    el.style.top = (Math.random() * 95) + '%';
+    el.style.animationDelay = (Math.random() * 4) + 's';
+    el.style.fontSize = (10 + Math.floor(Math.random() * 10)) + 'px';
+    el.style.opacity = (0.1 + Math.random() * 0.2);
+    codesLayer.appendChild(el);
+  }
+</script>
+
 </body>
 </html>
