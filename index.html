@@ -115,18 +115,10 @@
   }
 
   /* ── REVEAL SCREEN ── */
-  #reveal-screen {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    background: #000;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 1.5s ease;
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
-  #reveal-screen.show { display: flex; }
   @keyframes fadeIn {
     from { opacity: 0; }
     to   { opacity: 1; }
@@ -277,7 +269,7 @@
 </div>
 
 <!-- Reveal screen shown when countdown hits zero -->
-<div id="reveal-screen">
+<div id="reveal-screen" style="display:none; position:fixed; inset:0; z-index:50; background:#000; flex-direction:column; align-items:center; justify-content:center;">
   <img id="reveal-img" src="" alt="Revealed">
   <a id="download-btn" download="RED_SCHMIDT.png">⬇ Download Image</a>
 </div>
@@ -347,10 +339,14 @@
   }
 
   function showReveal() {
-    if (revealed) return;
-    revealed = true;
     document.getElementById('countdown-box').style.display = 'none';
-    document.getElementById('reveal-screen').classList.add('show');
+    document.getElementById('loading').style.display = 'none';
+    const screen = document.getElementById('reveal-screen');
+    const img = document.getElementById('reveal-img');
+    const btn = document.getElementById('download-btn');
+    img.src = imageSrc;
+    btn.href = imageSrc;
+    screen.style.display = 'flex';
   }
 
   function tick() {
