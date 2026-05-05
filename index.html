@@ -347,6 +347,43 @@
     img.src = imageSrc;
     btn.href = imageSrc;
     screen.style.display = 'flex';
+
+    // After user clicks download, show hidden message then link
+    btn.addEventListener('click', () => {
+      setTimeout(() => {
+        const hiddenMsg = document.getElementById('hidden-msg');
+        const hintText = document.getElementById('hint-text');
+        const nextLink = document.getElementById('next-link');
+        hiddenMsg.style.display = 'flex';
+
+        // Typewriter effect for the message
+        const message = "This image contains a hidden meaning...\nOpen it. Look carefully. What you find will lead you to the next step.";
+        let i = 0;
+        hintText.textContent = '';
+        const typeInterval = setInterval(() => {
+          if (i < message.length) {
+            hintText.textContent += message[i] === '\n' ? ' ' : message[i];
+            i++;
+          } else {
+            clearInterval(typeInterval);
+            // Show the link after typing finishes
+            setTimeout(() => {
+              nextLink.style.display = 'inline-block';
+            }, 800);
+          }
+        }, 35);
+
+        // Hide image and download button smoothly
+        img.style.transition = 'opacity 1s';
+        btn.style.transition = 'opacity 1s';
+        img.style.opacity = '0';
+        btn.style.opacity = '0';
+        setTimeout(() => {
+          img.style.display = 'none';
+          btn.style.display = 'none';
+        }, 1000);
+      }, 500);
+    });
   }
 
   function tick() {
